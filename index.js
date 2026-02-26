@@ -38,18 +38,19 @@ async function generateQuestion(usedQuestions = []) {
 
 REQUISITI:
 - Scegli un tema a caso tra: storia, scienza, geografia, sport, cinema, musica, gastronomia, tecnologia, natura, record mondiali, curiosità aziendali, biologia, astronomia
-- La risposta deve essere PRECISA (numero, anno, nome specifico, misura)
 - Difficoltà MEDIA: non banale (non "capitale dell'Italia", non "chi ha dipinto la Gioconda") ma nemmeno da specialisti
 - La risposta deve sorprendere chi non la conosce — qualcosa che fa dire "ah, non lo sapevo!"
 - Evita assolutamente domande notissime
 
-ESEMPI DEL LIVELLO GIUSTO:
+REGOLA CRITICA: la risposta deve essere SOLO un numero puro o un nome brevissimo. MAI includere unità di misura, MAI parole come "anni", "litri", "km/h", "metri", "kg" nella risposta. I giocatori non conoscono queste regole e scrivono risposte semplici come "4" o "160" — se la risposta corretta fosse "4 anni" si riconoscerebbe subito tra le altre. Scrivi sempre la domanda in modo che l'unità sia già nel testo della domanda stessa.
+
+ESEMPI CORRETTI:
 "In che anno fu fondata IKEA?" -> "1943"
-"Quanti litri può contenere uno stomaco umano adulto?" -> "1,5 litri"
+"A quanti km/h raggiunge in media uno starnuto?" -> "160"
+"Quanti litri può contenere uno stomaco umano?" -> "1,5"
+"Quanti anni ci ha messo Da Vinci a dipingere la Gioconda?" -> "4"
+"In quanti paesi è illegale masticare chewing-gum in pubblico?" -> "1"
 "In che anno è stata inventata la Nutella?" -> "1964"
-"Quanti km/h raggiunge in media uno starnuto?" -> "160 km/h"
-"In quanti paesi del mondo è illegale masticare chewing-gum in pubblico?" -> "1"
-"Quanti anni ci ha messo Leonardo da Vinci a dipingere la Gioconda?" -> "4 anni"
 
 Rispondi SOLO con JSON valido, nessun testo fuori: {"question": "...", "answer": "...", "hint": "una frase breve e curiosa che spiega la risposta"}`;
 
