@@ -33,10 +33,25 @@ function shuffleArray(arr) {
 }
 
 async function generateQuestion(usedQuestions = []) {
-  const usedStr = usedQuestions.length > 0 ? `Non ripetere queste domande: ${usedQuestions.join('; ')}. ` : '';
-  const prompt = `${usedStr}Genera UNA domanda di cultura generale molto specifica con risposta numerica o brevissima (max 3 parole). La risposta deve essere sorprendente o non ovvia ma verificabile. 
-Rispondi SOLO con JSON: {"question": "...", "answer": "...", "hint": "una brevissima spiegazione della risposta"}
-Esempi di stile: "Quante ossa ha il corpo umano adulto?" -> "206", "Quanto dura in minuti un film standard di Hollywood?" -> "110 minuti", "In che anno fu inventata la pizza margherita?" -> "1889"`;
+  const usedStr = usedQuestions.length > 0 ? `NON ripetere queste domande già usate: ${usedQuestions.join('; ')}. ` : '';
+  const prompt = `${usedStr}Genera UNA domanda trivia in italiano per un gioco tra amici adulti.
+
+REQUISITI:
+- Scegli un tema a caso tra: storia, scienza, geografia, sport, cinema, musica, gastronomia, tecnologia, natura, record mondiali, curiosità aziendali, biologia, astronomia
+- La risposta deve essere PRECISA (numero, anno, nome specifico, misura)
+- Difficoltà MEDIA: non banale (non "capitale dell'Italia", non "chi ha dipinto la Gioconda") ma nemmeno da specialisti
+- La risposta deve sorprendere chi non la conosce — qualcosa che fa dire "ah, non lo sapevo!"
+- Evita assolutamente domande notissime
+
+ESEMPI DEL LIVELLO GIUSTO:
+"In che anno fu fondata IKEA?" -> "1943"
+"Quanti litri può contenere uno stomaco umano adulto?" -> "1,5 litri"
+"In che anno è stata inventata la Nutella?" -> "1964"
+"Quanti km/h raggiunge in media uno starnuto?" -> "160 km/h"
+"In quanti paesi del mondo è illegale masticare chewing-gum in pubblico?" -> "1"
+"Quanti anni ci ha messo Leonardo da Vinci a dipingere la Gioconda?" -> "4 anni"
+
+Rispondi SOLO con JSON valido, nessun testo fuori: {"question": "...", "answer": "...", "hint": "una frase breve e curiosa che spiega la risposta"}`;
 
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
@@ -226,6 +241,12 @@ function startBetting(code) {
   const room = rooms[code];
   room.state = 'betting';
 
+  // Save fiches snapshot at start of betting round (for reference)
+  room.fichesAtRoundStart = {};
+  Object.keys(room.players).forEach(pid => {
+    room.fichesAtRoundStart[pid] = room.players[pid].fiches;
+  });
+
   // Build answer pool: all player answers + correct answer
   const correctAnswer = room.currentQuestion.answer;
   const playerAnswers = Object.entries(room.answers).map(([pid, ans]) => ({
@@ -250,12 +271,12 @@ function startBetting(code) {
   // Shuffle
   room.answerPool = shuffleArray(allAnswers);
 
-  // Send to clients (without isCorrect flag)
+  // Send to clients (without isCorrect flag, but with FRESH fiches)
   const publicPool = room.answerPool.map(a => ({ id: a.id, text: a.text }));
 
   io.to(code).emit('bettingPhase', {
     answers: publicPool,
-    players: getPlayersPublic(room),
+    players: getPlayersPublic(room), // always fresh from room.players
     timeLimit: BET_TIME
   });
 
@@ -287,10 +308,10 @@ function resolveRound(code) {
       if (!answer) return;
 
       if (answer.isCorrect) {
-        // Bet on correct: win 2x
+        // Bet on correct: win back bet + same profit (net +amt)
         deltas[bettorId] = (deltas[bettorId] || 0) + amt;
       } else {
-        // Bet on wrong: lose the bet, author gets it
+        // Bet on wrong: lose bet, author gains it
         deltas[bettorId] = (deltas[bettorId] || 0) - amt;
         if (answer.authorId && answer.authorId !== bettorId) {
           deltas[answer.authorId] = (deltas[answer.authorId] || 0) + amt;
@@ -299,7 +320,7 @@ function resolveRound(code) {
     });
   });
 
-  // Apply deltas
+  // Apply deltas to actual fiches — this is the single source of truth
   Object.entries(deltas).forEach(([pid, delta]) => {
     if (room.players[pid]) {
       room.players[pid].fiches = Math.max(0, room.players[pid].fiches + delta);
