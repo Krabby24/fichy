@@ -104,12 +104,71 @@ io.on('connection', (socket) => {
   socket.on('joinRoom', ({ code, playerName }) => {
     const room = rooms[code];
     if (!room) return socket.emit('error', { message: 'Stanza non trovata!' });
-    if (room.state !== 'lobby') return socket.emit('error', { message: 'Partita già iniziata!' });
+
+    // Check if this is a REJOIN (same name, was in the room before)
+    const existingEntry = Object.values(room.players).find(
+      p => p.name.toLowerCase() === playerName.trim().toLowerCase() && !p.connected
+    );
+
+    if (existingEntry) {
+      // Rejoin: migrate old player data to new socket id
+      const oldId = existingEntry.id;
+      const playerData = { ...existingEntry, id: socket.id, connected: true };
+      delete room.players[oldId];
+      room.players[socket.id] = playerData;
+
+      // Update host if needed
+      if (room.host === oldId) room.host = socket.id;
+
+      // Update answers/bets keys if they referenced old socket id
+      if (room.answers[oldId] !== undefined) {
+        room.answers[socket.id] = room.answers[oldId];
+        delete room.answers[oldId];
+      }
+      if (room.bets[oldId] !== undefined) {
+        room.bets[socket.id] = room.bets[oldId];
+        delete room.bets[oldId];
+      }
+      // Update answerPool authorId if present
+      if (room.answerPool) {
+        room.answerPool = room.answerPool.map(a =>
+          a.authorId === oldId ? { ...a, id: socket.id, authorId: socket.id } : a
+        );
+      }
+
+      socket.join(code);
+      socket.emit('roomJoined', { code, player: room.players[socket.id], rejoin: true, gameState: room.state });
+      io.to(code).emit('roomUpdate', getRoomPublicState(code));
+      io.to(code).emit('playerRejoined', { playerName: playerData.name });
+
+      // Send current game state so the rejoining player can catch up
+      if (room.state === 'answering') {
+        socket.emit('questionReady', {
+          round: room.round,
+          total: ROUNDS_PER_GAME,
+          question: room.currentQuestion.question,
+          timeLimit: ANSWER_TIME
+        });
+      } else if (room.state === 'betting') {
+        const publicPool = room.answerPool.map(a => ({ id: a.id, text: a.text }));
+        socket.emit('bettingPhase', {
+          answers: publicPool,
+          players: getPlayersPublic(room),
+          timeLimit: BET_TIME
+        });
+      } else if (room.state === 'results') {
+        // They missed the results, just show room update — next round will catch them
+      }
+      return;
+    }
+
+    // Normal join — only allowed in lobby
+    if (room.state !== 'lobby') return socket.emit('error', { message: 'Partita già iniziata! Se eri in gioco, usa lo stesso nome per rientrare.' });
     if (Object.keys(room.players).length >= 8) return socket.emit('error', { message: 'Stanza piena!' });
 
     room.players[socket.id] = {
       id: socket.id,
-      name: playerName,
+      name: playerName.trim(),
       fiches: STARTING_FICHES,
       connected: true
     };
