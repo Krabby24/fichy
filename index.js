@@ -18,6 +18,11 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // In-memory game state
 const rooms = {};
 
+// Global sliding window of used questions (max 100)
+// Persists across all rooms and sessions — prevents repeats server-wide
+const QUESTION_BUFFER_SIZE = 100;
+const globalUsedQuestions = [];
+
 function generateRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   return Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
@@ -32,8 +37,8 @@ function shuffleArray(arr) {
   return a;
 }
 
-async function generateQuestion(usedQuestions = []) {
-  const usedStr = usedQuestions.length > 0 ? `NON ripetere queste domande già usate: ${usedQuestions.join('; ')}. ` : '';
+async function generateQuestion() {
+  const usedStr = globalUsedQuestions.length > 0 ? `NON ripetere queste domande già usate: ${globalUsedQuestions.join('; ')}. ` : '';
   const prompt = `${usedStr}Genera UNA domanda trivia in italiano per un gioco tra amici adulti.
 
 REQUISITI:
@@ -255,9 +260,13 @@ async function startRound(code) {
   io.to(code).emit('roundStarting', { round: room.round, total: ROUNDS_PER_GAME });
 
   try {
-    const q = await generateQuestion(room.usedQuestions);
+    const q = await generateQuestion();
     room.currentQuestion = q;
-    room.usedQuestions.push(q.question);
+    // Add to global sliding window — remove oldest if over limit
+    globalUsedQuestions.push(q.question);
+    if (globalUsedQuestions.length > QUESTION_BUFFER_SIZE) {
+      globalUsedQuestions.shift();
+    }
 
     io.to(code).emit('questionReady', {
       round: room.round,
