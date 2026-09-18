@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const Anthropic = require('@anthropic-ai/sdk');
+const OpenAI = require('openai');
 
 const app = express();
 app.use(cors());
@@ -13,7 +13,7 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // In-memory game state
 const rooms = {};
@@ -59,15 +59,34 @@ ESEMPI CORRETTI:
 
 Rispondi SOLO con JSON valido, nessun testo fuori: {"question": "...", "answer": "...", "hint": "una frase breve e curiosa che spiega la risposta"}`;
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 300,
-    messages: [{ role: 'user', content: prompt }]
+  const response = await openai.responses.create({
+    model: 'gpt-5.6-luna',
+    reasoning: { effort: 'none' },
+    max_output_tokens: 300,
+    input: prompt,
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'trivia_question',
+        strict: true,
+        schema: {
+          type: 'object',
+          properties: {
+            question: { type: 'string' },
+            answer: { type: 'string' },
+            hint: { type: 'string' }
+          },
+          required: ['question', 'answer', 'hint'],
+          additionalProperties: false
+        }
+      }
+    }
   });
 
-  const text = response.content[0].text.trim();
-  const clean = text.replace(/```json|```/g, '').trim();
-  return JSON.parse(clean);
+  if (response.status !== 'completed' || !response.output_text) {
+    throw new Error(`OpenAI question generation failed: ${response.status}`);
+  }
+  return JSON.parse(response.output_text);
 }
 
 const STARTING_FICHES = 20;
