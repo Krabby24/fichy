@@ -39,25 +39,222 @@ function shuffleArray(arr) {
 
 async function generateQuestion() {
   const usedStr = globalUsedQuestions.length > 0 ? `NON ripetere queste domande già usate: ${globalUsedQuestions.join('; ')}. ` : '';
-  const prompt = `${usedStr}Genera UNA domanda trivia in italiano per un gioco tra amici adulti.
+  const prompt = `${usedStr}Genera UNA sola domanda trivia in italiano per Fichy, un gioco tra amici adulti.
 
-REQUISITI:
-- Scegli un tema a caso tra: storia, scienza, geografia, sport, cinema, musica, gastronomia, tecnologia, natura, record mondiali, curiosità aziendali, biologia, astronomia
-- Difficoltà MEDIA: non banale (non "capitale dell'Italia", non "chi ha dipinto la Gioconda") ma nemmeno da specialisti
-- La risposta deve sorprendere chi non la conosce — qualcosa che fa dire "ah, non lo sapevo!"
-- Evita assolutamente domande notissime
+## OBIETTIVO DEL GIOCO
 
-REGOLA CRITICA: la risposta deve essere SOLO un numero puro o un nome brevissimo. MAI includere unità di misura, MAI parole come "anni", "litri", "km/h", "metri", "kg" nella risposta. I giocatori non conoscono queste regole e scrivono risposte semplici come "4" o "160" — se la risposta corretta fosse "4 anni" si riconoscerebbe subito tra le altre. Scrivi sempre la domanda in modo che l'unità sia già nel testo della domanda stessa.
+La domanda ideale di Fichy riguarda qualcosa che quasi tutti conoscono o riescono immediatamente a comprendere, ma chiede un fatto che quasi nessuno conosce con certezza.
 
-ESEMPI CORRETTI:
-"In che anno fu fondata IKEA?" -> "1943"
-"A quanti km/h raggiunge in media uno starnuto?" -> "160"
-"Quanti litri può contenere uno stomaco umano?" -> "1,5"
-"Quanti anni ci ha messo Da Vinci a dipingere la Gioconda?" -> "4"
-"In quanti paesi è illegale masticare chewing-gum in pubblico?" -> "1"
-"In che anno è stata inventata la Nutella?" -> "1964"
+Il giocatore deve pensare:
+"Conosco bene l'argomento, potrei ragionarci... ma non so davvero la risposta."
 
-Rispondi SOLO con JSON valido, nessun testo fuori: {"question": "...", "answer": "...", "hint": "una frase breve e curiosa che spiega la risposta"}`;
+Questa caratteristica è PIÙ IMPORTANTE della semplice difficoltà.
+
+## CARATTERISTICHE DI UNA DOMANDA PERFETTA
+
+La domanda deve avere contemporaneamente queste caratteristiche:
+
+1. TEMA FAMILIARE
+L'argomento deve essere comprensibile da una persona adulta senza conoscenze specialistiche.
+
+Sono ottimi temi:
+- vita quotidiana
+- animali
+- corpo umano
+- tecnologia comune
+- automobili
+- cibo e bevande
+- sport conosciuti
+- cinema e musica
+- geografia
+- storia accessibile
+- aziende e prodotti famosi
+- invenzioni
+- spazio e pianeti
+- curiosità scientifiche comprensibili
+- oggetti comuni
+- cultura popolare
+- record curiosi
+
+2. RISPOSTA POCO CONOSCIUTA
+La maggior parte dei giocatori non dovrebbe sapere immediatamente la risposta.
+
+Evita fatti scolastici, domande classiche da quiz o informazioni estremamente famose.
+
+3. POSSIBILITÀ DI RAGIONARE
+Anche senza sapere la risposta, un giocatore deve poter formulare 2-5 ipotesi plausibili usando intuizione, cultura generale o associazioni.
+
+Una domanda NON è buona se:
+- o conosci una nozione specialistica,
+- oppure puoi soltanto tirare completamente a caso.
+
+4. EFFETTO "NON LO SAPEVO"
+La risposta dovrebbe essere interessante, curiosa o leggermente sorprendente quando viene rivelata.
+
+5. POCHI INDIZI, MA SUFFICIENTI
+Non inserire nella domanda così tanti dettagli da rendere la risposta quasi evidente.
+
+Gli indizi devono permettere di capire bene la domanda, non risolverla automaticamente.
+
+6. NIENTE NICCHIE SPECIALISTICHE
+Evita termini o conoscenze che appartengono soprattutto a:
+- ingegneria specialistica
+- medicina avanzata
+- modelli specifici di automobili
+- componenti tecnici
+- tassonomia scientifica avanzata
+- battaglie o personaggi storici minori
+- statistiche sportive oscure
+- prodotti tecnologici dimenticati
+- dettagli industriali molto specifici
+
+Un termine tecnico può essere usato solamente se è ampiamente conosciuto dal pubblico generale.
+
+## CONTROLLO DELLA DIFFICOLTÀ
+
+NON confondere "difficile" con "oscuro".
+
+Una buona domanda è difficile perché la risposta è poco conosciuta.
+
+Una cattiva domanda è difficile perché l'argomento stesso è sconosciuto.
+
+Preferisci sempre:
+ARGOMENTO FAMILIARE + RISPOSTA INSOLITA
+
+rispetto a:
+ARGOMENTO SPECIALISTICO + RISPOSTA IMPOSSIBILE DA DEDURRE
+
+## EVITA DOMANDE TROPPO FACILI
+
+Evita domande in cui:
+- un singolo indizio famoso rivela praticamente la risposta;
+- la risposta è cultura generale elementare;
+- la formulazione contiene indirettamente la soluzione;
+- esiste una sola associazione immediata possibile.
+
+Esempio da evitare:
+"Quale azienda produttrice di pneumatici pubblicò una famosa guida gastronomica?"
+È troppo guidata: pneumatici + guida gastronomica rende la risposta quasi immediata.
+
+## EVITA DOMANDE TROPPO DI NICCHIA
+
+Esempio da evitare:
+"Quale casa automobilistica introdusse per prima un modello di serie con motore rotativo Wankel?"
+Richiede familiarità con una tecnologia automobilistica specifica e non permette alla maggior parte delle persone di ragionare.
+
+## ESEMPI DEL TIPO DI DOMANDA CHE FUNZIONA BENE
+
+"Quale paese vinse il primo campionato mondiale di calcio femminile nel 1991?"
+→ "Stati Uniti"
+
+"Quale animale è noto per avere tre cuori e sangue blu?"
+→ "polpo"
+
+"Quale paese è considerato il luogo di nascita del karaoke?"
+→ "Giappone"
+
+"Quale oggetto fu il primo prodotto ad avere il proprio codice a barre scansionato alla cassa nel 1974?"
+→ "chewing gum"
+
+"In che anno fu fondata IKEA?"
+→ "1943"
+
+Nota il principio comune:
+il soggetto è conosciuto, ma la risposta non è normalmente conosciuta con certezza.
+
+NON copiare o riformulare continuamente questi esempi.
+
+## RISPOSTE NUMERICHE E NON NUMERICHE
+
+NON privilegiare le domande numeriche.
+
+La risposta può essere indifferentemente:
+- un numero;
+- un anno;
+- un paese;
+- una città;
+- una persona;
+- un animale;
+- un'azienda;
+- un prodotto;
+- un oggetto;
+- un pianeta;
+- un nome molto breve.
+
+Scegli il formato che produce la domanda più divertente.
+
+Cerca varietà rispetto alle domande già utilizzate.
+
+## FORMATO DELLA RISPOSTA CORRETTA
+
+La risposta deve essere:
+- un numero puro; oppure
+- un nome molto breve, idealmente da 1 a 4 parole.
+
+Se la risposta è numerica, NON inserire unità di misura nella risposta.
+
+SBAGLIATO:
+"160 km/h"
+"4 anni"
+"3 litri"
+
+CORRETTO:
+"160"
+"4"
+"3"
+
+L'unità deve già comparire nella domanda.
+
+## SOLIDITÀ FATTUALE — REGOLA FONDAMENTALE
+
+Genera solamente domande la cui risposta ritieni altamente affidabile e univoca.
+
+Evita una domanda se:
+- esistono diverse risposte possibili a seconda della definizione;
+- il fatto è controverso;
+- dipende da una leggenda o da una versione non verificabile;
+- il dato cambia frequentemente;
+- il record potrebbe non essere più attuale;
+- non sei sicuro della risposta;
+- parole come "primo", "inventò", "più grande", "più antico" o "maggior numero" rendono la risposta ambigua.
+
+Puoi usare questi concetti solamente quando il fatto è stabile e la risposta è chiaramente riconosciuta.
+
+Meglio rinunciare a una domanda interessante che generare una domanda contestabile.
+
+## STILE
+
+La domanda deve:
+- essere breve;
+- essere naturale in italiano;
+- essere immediatamente comprensibile;
+- non contenere spiegazioni inutili;
+- non sembrare scritta da un'enciclopedia;
+- non aggiungere frasi decorative che non aiutano il gioco.
+
+Elimina dettagli superflui.
+
+## VARIETÀ
+
+Osserva le domande già utilizzate indicate sopra.
+
+Evita:
+- domande identiche o quasi identiche;
+- lo stesso fatto raccontato in modo diverso;
+- sequenze di domande tutte sullo stesso argomento;
+- troppe risposte dello stesso tipo;
+- troppe domande basate su "chi fu il primo...";
+- troppe domande basate su anni o numeri.
+
+## HINT
+
+L'hint deve essere una sola frase breve che, dopo la rivelazione della risposta, spiega perché quella risposta è corretta o aggiunge una piccola curiosità utile.
+
+Non deve introdurre affermazioni dubbie o inutilmente complicate.
+
+Rispondi ESCLUSIVAMENTE con JSON valido nel seguente formato:
+
+{"question":"...","answer":"...","hint":"..."}`;
 
   const response = await openai.responses.create({
     model: 'gpt-5.6-luna',
