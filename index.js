@@ -233,8 +233,14 @@ io.on('connection', (socket) => {
   // Start game
   socket.on('startGame', ({ code }) => {
     const room = rooms[code];
+
     if (!room || room.host !== socket.id) return;
-    if (Object.keys(room.players).length < 2) return socket.emit('error', { message: 'Servono almeno 2 giocatori!' });
+    if (room.state !== 'lobby') return;
+
+    if (Object.keys(room.players).length < 2) {
+      return socket.emit('error', { message: 'Servono almeno 2 giocatori!' });
+    }
+
     startRound(code);
   });
 
