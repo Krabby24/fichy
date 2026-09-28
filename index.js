@@ -39,106 +39,53 @@ function shuffleArray(arr) {
 
 async function generateQuestion() {
   const usedStr = globalUsedQuestions.length > 0 ? `NON ripetere queste domande già usate: ${globalUsedQuestions.join('; ')}. ` : '';
-  const prompt = `${usedStr}Genera UNA sola domanda trivia in italiano per Fichy, un gioco tra amici adulti.
+  const prompt = `${usedStr}Genera UNA sola domanda trivia in italiano per Fichy, un gioco tra amici basato anche sul bluff.
 
-## OBIETTIVO
+La domanda ideale deve far pensare:
+"Conosco l'argomento, posso ragionarci e inventare una risposta plausibile, ma non so con certezza quella corretta."
 
-Genera una domanda che produca il momento:
-"Conosco l'argomento, posso provare a ragionare, ma non so la risposta."
+REGOLE:
 
-La domanda ideale NON deve essere né banale né specialistica.
+- Usa un argomento familiare al pubblico generale, ma chiedi un fatto poco conosciuto.
+- La difficoltà deve derivare dalla risposta non ovvia, NON da termini specialistici o argomenti oscuri.
+- Deve essere possibile immaginare diverse risposte sbagliate ma credibili: questo è fondamentale per permettere ai giocatori di bluffare.
+- Evita domande in cui la risposta è il primo pensiero che viene in mente o è praticamente suggerita dalla formulazione.
+- Evita domande puramente nozionistiche in cui, se non conosci il fatto, puoi solo tirare a caso.
+- La risposta deve essere sorprendente o curiosa quando viene rivelata.
+- Deve esistere una sola risposta chiaramente corretta e verificabile. Evita fatti controversi, ambigui o dipendenti da definizioni discutibili.
 
-La difficoltà deve derivare dal fatto che la risposta è poco conosciuta, non dal fatto che l'argomento è sconosciuto.
+VARIETÀ:
+Guarda le domande già usate e cambia spesso area. Non concentrarti su animali, natura, scienza o qualunque altra categoria.
+Alterna liberamente tra storia, geografia, sport, cinema, musica, tecnologia, aziende e prodotti famosi, cibo, vita quotidiana, spazio, natura, scienza e cultura generale.
+Evita di ripetere la stessa curiosità o varianti molto simili.
 
-## REGOLE PRINCIPALI
+ESEMPI DELLO STILE GIUSTO:
 
-La domanda deve avere:
+"Quale paese vinse il primo campionato mondiale di calcio femminile nel 1991?"
+→ "Stati Uniti"
 
-- un argomento familiare e comprensibile a tutti;
-- una risposta sorprendente o curiosa;
-- una risposta che la maggior parte delle persone non conosce;
-- la possibilità di fare ipotesi ragionate.
+"Quale paese possiede il maggior numero di isole al mondo?"
+→ "Svezia"
 
-Preferisci sempre:
-
-ARGOMENTO FAMILIARE + RISPOSTA INSOLITA
-
-Esempio:
 "Quale animale ha impronte digitali così simili a quelle umane da poter confondere un'indagine?"
-→ koala
+→ "koala"
 
-Non preferire:
+ESEMPI DA EVITARE:
 
-ARGOMENTO SPECIALISTICO + RISPOSTA OSCURA
+"Quale frutto si usa per preparare il guacamole?"
+→ troppo ovvia
 
-Esempio da evitare:
-"Quale casa automobilistica introdusse per prima un modello con motore rotativo Wankel?"
-(per rispondere serve una conoscenza troppo specifica)
+"Quale casa automobilistica introdusse un modello con motore rotativo Wankel?"
+→ troppo specialistica
 
-## EVITA DOMANDE TROPPO FACILI
+RISPOSTA:
+Deve essere un numero puro oppure un nome breve.
+Se è numerica, non includere unità di misura nella risposta.
 
-Non creare domande dove la risposta è il primo pensiero che viene in mente.
-
-Esempi da evitare:
-"Quale frutto viene usato per preparare il guacamole?"
-"Quale bevanda fu inventata da un farmacista di Atlanta nel 1886?"
-
-La domanda deve lasciare spazio al dubbio e al ragionamento.
-
-## TIPOLOGIE CONSIGLIATE
-
-Scegli liberamente tra:
-- animali e natura
-- scienza comprensibile
-- spazio
-- storia curiosa
-- tecnologia
-- aziende famose
-- prodotti conosciuti
-- cibo
-- sport
-- cinema e musica
-- geografia
-
-Evita dettagli troppo tecnici o di nicchia.
-
-## QUALITÀ DELLA RISPOSTA
-
-La risposta deve essere un fatto stabile e verificabile.
-
-Evita domande:
-- con risposte controverse;
-- basate su record non aggiornati;
-- con definizioni ambigue;
-- dove esistono più risposte corrette.
-
-## RISPOSTA
-
-La risposta deve essere:
-- un numero puro;
-- oppure un nome breve (persona, animale, luogo, azienda, prodotto, oggetto).
-
-Non aggiungere unità di misura nella risposta.
-
-Esempi:
-"4" e non "4 anni"
-"160" e non "160 km/h"
-
-## VARIETÀ
-
-Non ripetere domande già utilizzate.
-
-Evita troppe domande:
-- numeriche consecutive;
-- basate su "primo inventore";
-- sullo stesso argomento.
-
-## HINT
-
-L'hint deve essere una frase breve che spiega la risposta o aggiunge una curiosità interessante.
+HINT:
+Una sola frase breve che spiega la risposta o aggiunge una curiosità.
 
 Rispondi esclusivamente con JSON valido:
-
 {"question":"...","answer":"...","hint":"..."}`;
 
   const response = await openai.responses.create({
