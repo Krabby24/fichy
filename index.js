@@ -18,10 +18,13 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // In-memory game state
 const rooms = {};
 
-// Global sliding window of used questions (max 100)
-// Persists across all rooms and sessions — prevents repeats server-wide
+// Global sliding windows of used questions (max 100 per language)
+// Persist across all rooms and sessions — prevent repeats server-wide
 const QUESTION_BUFFER_SIZE = 100;
-const globalUsedQuestions = [];
+const globalUsedQuestions = {
+  it: [],
+  en: []
+};
 
 function generateRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -37,9 +40,44 @@ function shuffleArray(arr) {
   return a;
 }
 
-async function generateQuestion() {
-  const usedStr = globalUsedQuestions.length > 0 ? `NON ripetere queste domande già usate: ${globalUsedQuestions.join('; ')}. ` : '';
-  const prompt = `${usedStr}Genera UNA sola domanda trivia in italiano per Fichy, un gioco tra amici basato anche sul bluff.
+function normalizeLanguage(language) {
+  return language === 'en' ? 'en' : 'it';
+}
+
+const SERVER_MESSAGES = {
+  it: {
+    roomNotFound: 'Stanza non trovata!',
+    gameStarted: 'Partita già iniziata! Se eri in gioco, usa lo stesso nome per rientrare.',
+    roomFull: 'Stanza piena!',
+    needTwoPlayers: 'Servono almeno 2 giocatori!',
+    playerDisconnected: 'Un giocatore ha lasciato il tavolo'
+  },
+  en: {
+    roomNotFound: 'Room not found!',
+    gameStarted: 'The game has already started! If you were playing, use the same name to rejoin.',
+    roomFull: 'Room is full!',
+    needTwoPlayers: 'At least 2 players are required!',
+    playerDisconnected: 'A player has left the table'
+  }
+};
+
+function getServerMessage(language, key) {
+  const normalizedLanguage = normalizeLanguage(language);
+  return SERVER_MESSAGES[normalizedLanguage][key];
+}
+
+async function generateQuestion(language = 'it') {
+  const normalizedLanguage = normalizeLanguage(language);
+  const languageName = normalizedLanguage === 'en' ? 'inglese' : 'italiano';
+  const usedQuestions = globalUsedQuestions[normalizedLanguage];
+
+  const usedStr = usedQuestions.length > 0
+    ? `NON ripetere queste domande già usate: ${usedQuestions.join('; ')}. `
+    : '';
+
+  const prompt = `${usedStr}Genera UNA sola domanda trivia in ${languageName} per Fichy, un gioco tra amici basato anche sul bluff.
+
+Domanda, risposta e hint devono essere interamente in ${languageName}.
 
 La domanda ideale deve far pensare:
 "Conosco l'argomento, posso ragionarci e inventare una risposta plausibile, ma non so con certezza quella corretta."
@@ -127,10 +165,13 @@ io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
   // Create room
-  socket.on('createRoom', ({ playerName }) => {
+  socket.on('createRoom', ({ playerName, language }) => {
     const code = generateRoomCode();
+    const roomLanguage = normalizeLanguage(language);
+
     rooms[code] = {
       code,
+      language: roomLanguage,
       host: socket.id,
       players: {
         [socket.id]: {
@@ -149,14 +190,24 @@ io.on('connection', (socket) => {
       timer: null
     };
     socket.join(code);
-    socket.emit('roomCreated', { code, player: rooms[code].players[socket.id] });
+    socket.emit('roomCreated', {
+      code,
+      player: rooms[code].players[socket.id],
+      language: roomLanguage
+    });
     io.to(code).emit('roomUpdate', getRoomPublicState(code));
   });
 
   // Join room
-  socket.on('joinRoom', ({ code, playerName }) => {
+  socket.on('joinRoom', ({ code, playerName, language }) => {
+    const requestLanguage = normalizeLanguage(language);
     const room = rooms[code];
-    if (!room) return socket.emit('error', { message: 'Stanza non trovata!' });
+
+    if (!room) {
+      return socket.emit('error', {
+        message: getServerMessage(requestLanguage, 'roomNotFound')
+      });
+    }
 
     // Check if this is a REJOIN (same name, was in the room before)
     const existingEntry = Object.values(room.players).find(
@@ -190,7 +241,13 @@ io.on('connection', (socket) => {
       }
 
       socket.join(code);
-      socket.emit('roomJoined', { code, player: room.players[socket.id], rejoin: true, gameState: room.state });
+      socket.emit('roomJoined', {
+        code,
+        player: room.players[socket.id],
+        language: room.language,
+        rejoin: true,
+        gameState: room.state
+      });
       io.to(code).emit('roomUpdate', getRoomPublicState(code));
       io.to(code).emit('playerRejoined', { playerName: playerData.name });
 
@@ -216,8 +273,17 @@ io.on('connection', (socket) => {
     }
 
     // Normal join — only allowed in lobby
-    if (room.state !== 'lobby') return socket.emit('error', { message: 'Partita già iniziata! Se eri in gioco, usa lo stesso nome per rientrare.' });
-    if (Object.keys(room.players).length >= 8) return socket.emit('error', { message: 'Stanza piena!' });
+    if (room.state !== 'lobby') {
+      return socket.emit('error', {
+        message: getServerMessage(room.language, 'gameStarted')
+      });
+    }
+
+    if (Object.keys(room.players).length >= 8) {
+      return socket.emit('error', {
+        message: getServerMessage(room.language, 'roomFull')
+      });
+    }
 
     room.players[socket.id] = {
       id: socket.id,
@@ -226,7 +292,11 @@ io.on('connection', (socket) => {
       connected: true
     };
     socket.join(code);
-    socket.emit('roomJoined', { code, player: room.players[socket.id] });
+    socket.emit('roomJoined', {
+      code,
+      player: room.players[socket.id],
+      language: room.language
+    });
     io.to(code).emit('roomUpdate', getRoomPublicState(code));
   });
 
@@ -238,7 +308,9 @@ io.on('connection', (socket) => {
     if (room.state !== 'lobby') return;
 
     if (Object.keys(room.players).length < 2) {
-      return socket.emit('error', { message: 'Servono almeno 2 giocatori!' });
+      return socket.emit('error', {
+        message: getServerMessage(room.language, 'needTwoPlayers')
+      });
     }
 
     startRound(code);
@@ -279,7 +351,10 @@ io.on('connection', (socket) => {
       const room = rooms[code];
       if (room.players[socket.id]) {
         room.players[socket.id].connected = false;
-        io.to(code).emit('playerDisconnected', { playerId: socket.id });
+        io.to(code).emit('playerDisconnected', {
+          playerId: socket.id,
+          message: getServerMessage(room.language, 'playerDisconnected')
+        });
         // If host disconnects, assign new host
         if (room.host === socket.id) {
           const others = Object.keys(room.players).filter(id => id !== socket.id && room.players[id].connected);
@@ -314,12 +389,14 @@ async function startRound(code) {
   io.to(code).emit('roundStarting', { round: room.round, total: ROUNDS_PER_GAME });
 
   try {
-    const q = await generateQuestion();
+    const q = await generateQuestion(room.language);
     room.currentQuestion = q;
-    // Add to global sliding window — remove oldest if over limit
-    globalUsedQuestions.push(q.question);
-    if (globalUsedQuestions.length > QUESTION_BUFFER_SIZE) {
-      globalUsedQuestions.shift();
+    // Add to the language-specific global sliding window — remove oldest if over limit
+    const questionBuffer = globalUsedQuestions[normalizeLanguage(room.language)];
+    questionBuffer.push(q.question);
+
+    if (questionBuffer.length > QUESTION_BUFFER_SIZE) {
+      questionBuffer.shift();
     }
 
     io.to(code).emit('questionReady', {
@@ -340,11 +417,19 @@ async function startRound(code) {
   } catch (e) {
     console.error('Question generation failed:', e);
     // Fallback question
-    room.currentQuestion = {
-      question: 'Quante ossa ha il corpo umano adulto?',
-      answer: '206',
-      hint: 'I neonati ne hanno circa 270, poi alcune si fondono.'
-    };
+    if (normalizeLanguage(room.language) === 'en') {
+      room.currentQuestion = {
+        question: 'How many bones are in the adult human body?',
+        answer: '206',
+        hint: 'Babies have around 270 bones, but some fuse together as they grow.'
+      };
+    } else {
+      room.currentQuestion = {
+        question: 'Quante ossa ha il corpo umano adulto?',
+        answer: '206',
+        hint: 'I neonati ne hanno circa 270, poi alcune si fondono.'
+      };
+    }
     io.to(code).emit('questionReady', {
       round: room.round,
       total: ROUNDS_PER_GAME,
@@ -481,6 +566,7 @@ function getRoomPublicState(code) {
   const room = rooms[code];
   return {
     code: room.code,
+    language: room.language,
     state: room.state,
     round: room.round,
     total: ROUNDS_PER_GAME,
