@@ -178,7 +178,8 @@ io.on('connection', (socket) => {
           id: socket.id,
           name: playerName,
           fiches: STARTING_FICHES,
-          connected: true
+          connected: true,
+          correctStreak: 0
         }
       },
       state: 'lobby', // lobby | answering | betting | results | gameover
@@ -289,7 +290,8 @@ io.on('connection', (socket) => {
       id: socket.id,
       name: playerName.trim(),
       fiches: STARTING_FICHES,
-      connected: true
+      connected: true,
+      correctStreak: 0
     };
     socket.join(code);
     socket.emit('roomJoined', {
@@ -371,6 +373,8 @@ io.on('connection', (socket) => {
   socket.on('nextRound', ({ code }) => {
     const room = rooms[code];
     if (!room || room.host !== socket.id) return;
+    if (room.state !== 'results') return;
+
     if (room.round >= ROUNDS_PER_GAME) {
       endGame(code);
     } else {
@@ -528,6 +532,100 @@ function resolveRound(code) {
     });
   });
 
+  // Update consecutive correct-answer streaks.
+  // This tracks the player's submitted trivia answer, not their betting result.
+  const normalizedCorrectAnswer = correctAnswer.toLowerCase().trim();
+  Object.keys(room.players).forEach(pid => {
+    const submittedAnswer = (room.answers[pid] || '').toLowerCase().trim();
+    const answeredCorrectly = submittedAnswer === normalizedCorrectAnswer;
+    const previousStreak = room.players[pid].correctStreak || 0;
+    room.players[pid].correctStreak = answeredCorrectly ? previousStreak + 1 : 0;
+  });
+
+  // Build at most two structured highlights for the round.
+  // The frontend turns these language-independent events into localized copy.
+  const highlights = [];
+
+  const bluffCandidates = pool
+    .filter(answer => !answer.isCorrect && answer.authorId && room.players[answer.authorId])
+    .map(answer => {
+      const victimIds = [];
+      let chipsWon = 0;
+
+      Object.entries(room.bets).forEach(([bettorId, bettorBets]) => {
+        if (bettorId === answer.authorId) return;
+
+        const amount = parseInt(bettorBets[answer.id]) || 0;
+        if (amount <= 0) return;
+
+        victimIds.push(bettorId);
+        chipsWon += amount;
+      });
+
+      return {
+        answer,
+        victimIds,
+        chipsWon
+      };
+    })
+    .filter(candidate => candidate.victimIds.length > 0)
+    .sort((a, b) => {
+      if (b.victimIds.length !== a.victimIds.length) {
+        return b.victimIds.length - a.victimIds.length;
+      }
+      return b.chipsWon - a.chipsWon;
+    });
+
+  if (bluffCandidates.length > 0) {
+    const bestBluff = bluffCandidates[0];
+    const author = room.players[bestBluff.answer.authorId];
+    const victimNames = bestBluff.victimIds
+      .map(pid => room.players[pid] ? room.players[pid].name : null)
+      .filter(Boolean);
+
+    highlights.push({
+      type: 'bluff_success',
+      playerId: author.id,
+      playerName: author.name,
+      victimNames,
+      victimCount: victimNames.length,
+      chipsWon: bestBluff.chipsWon
+    });
+  }
+
+  const streakCandidates = Object.values(room.players)
+    .filter(player => (player.correctStreak || 0) >= 3)
+    .sort((a, b) => b.correctStreak - a.correctStreak);
+
+  if (streakCandidates.length > 0 && highlights.length < 2) {
+    const streakPlayer = streakCandidates[0];
+    highlights.push({
+      type: 'correct_streak',
+      playerId: streakPlayer.id,
+      playerName: streakPlayer.name,
+      streak: streakPlayer.correctStreak
+    });
+  }
+
+  // If there is still room, show the strongest positive swing of the round.
+  // Avoid duplicating a player already featured above.
+  if (highlights.length < 2) {
+    const highlightedPlayerIds = new Set(highlights.map(highlight => highlight.playerId));
+    const gainCandidates = Object.entries(deltas)
+      .filter(([pid, delta]) => delta > 0 && room.players[pid] && !highlightedPlayerIds.has(pid))
+      .sort((a, b) => b[1] - a[1]);
+
+    if (gainCandidates.length > 0) {
+      const [playerId, delta] = gainCandidates[0];
+      highlights.push({
+        type: 'round_gain',
+        playerId,
+        playerName: room.players[playerId].name,
+        delta
+      });
+    }
+  }
+
   // Apply deltas to actual fiches — this is the single source of truth
   Object.entries(deltas).forEach(([pid, delta]) => {
     if (room.players[pid]) {
@@ -548,6 +646,7 @@ function resolveRound(code) {
     bets: room.bets,
     deltas,
     players: getPlayersPublic(room),
+    highlights,
     round: room.round,
     total: ROUNDS_PER_GAME,
     isLastRound: room.round >= ROUNDS_PER_GAME
