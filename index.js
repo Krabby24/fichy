@@ -75,53 +75,50 @@ async function generateQuestion(language = 'it') {
     ? `NON ripetere queste domande già usate: ${usedQuestions.join('; ')}. `
     : '';
 
-  const prompt = `${usedStr}Genera UNA sola domanda trivia in ${languageName} per Fichy, un gioco tra amici basato anche sul bluff.
+  const prompt = `${usedStr}Genera UNA sola domanda trivia in ${languageName} per Fichy, un gioco tra amici basato sul bluff.
 
 Domanda, risposta e hint devono essere interamente in ${languageName}.
 
-La domanda ideale deve far pensare:
-"Conosco l'argomento, posso ragionarci e inventare una risposta plausibile, ma non so con certezza quella corretta."
+OBIETTIVO PRINCIPALE:
+La domanda deve permettere anche a chi NON conosce la risposta di inventare subito diverse risposte false credibili con cui ingannare gli altri.
 
-REGOLE:
+REGOLA FONDAMENTALE:
+Se un giocatore medio che non conosce la risposta non riuscirebbe a pensare rapidamente ad almeno 3-5 risposte plausibili, scegli un'altra domanda.
 
-- Usa un argomento familiare al pubblico generale, ma chiedi un fatto poco conosciuto.
-- La difficoltà deve derivare dalla risposta non ovvia, NON da termini specialistici o argomenti oscuri.
-- Deve essere possibile immaginare diverse risposte sbagliate ma credibili: questo è fondamentale per permettere ai giocatori di bluffare.
-- Evita domande in cui la risposta è il primo pensiero che viene in mente o è praticamente suggerita dalla formulazione.
-- Evita domande puramente nozionistiche in cui, se non conosci il fatto, puoi solo tirare a caso.
-- La risposta deve essere sorprendente o curiosa quando viene rivelata.
-- Deve esistere una sola risposta chiaramente corretta e verificabile. Evita fatti controversi, ambigui o dipendenti da definizioni discutibili.
+PREFERISCI:
+- categorie familiari e immediate: paesi, città, aziende, marchi, animali, cibi, sport, film, musica, oggetti comuni, personaggi famosi, spazio, cultura generale;
+- fatti non ovvi all'interno di argomenti conosciuti da tutti;
+- domande semplici, dirette e brevi.
 
-VARIETÀ:
-Guarda le domande già usate e cambia spesso area. Non concentrarti su animali, natura, scienza o qualunque altra categoria.
-Alterna liberamente tra storia, geografia, sport, cinema, musica, tecnologia, aziende e prodotti famosi, cibo, vita quotidiana, spazio, natura, scienza e cultura generale.
-Evita di ripetere la stessa curiosità o varianti molto simili.
+EVITA:
+- argomenti specialistici o di nicchia;
+- curiosità troppo oscure o arbitrarie;
+- domande in cui chi non sa può solo tirare completamente a caso;
+- dettagli, retroscena o spiegazioni che abbelliscono la domanda;
+- indizi che rendono la risposta troppo evidente;
+- formulazioni lunghe o narrative;
+- fatti controversi, ambigui o con più risposte corrette.
 
-ESEMPI DELLO STILE GIUSTO:
+La domanda deve contenere SOLO le informazioni necessarie per capire cosa viene chiesto.
+Eventuali dettagli curiosi o retroscena devono andare nell'hint, NON nella domanda.
 
-"Quale paese vinse il primo campionato mondiale di calcio femminile nel 1991?"
-→ "Stati Uniti"
-
+ESEMPI GIUSTI:
 "Quale paese possiede il maggior numero di isole al mondo?"
-→ "Svezia"
-
-"Quale animale ha impronte digitali così simili a quelle umane da poter confondere un'indagine?"
-→ "koala"
+"Quale azienda automobilistica diede a un suo modello il nome di una tempesta atlantica?"
+"Quale paese vinse il primo campionato mondiale di calcio femminile?"
 
 ESEMPI DA EVITARE:
+"Quale famoso romanzo fu scritto da Bram Stoker, che non visitò mai la Transilvania?"
+→ la risposta è praticamente suggerita.
 
-"Quale frutto si usa per preparare il guacamole?"
-→ troppo ovvia
-
-"Quale casa automobilistica introdusse un modello con motore rotativo Wankel?"
-→ troppo specialistica
+"Quale oggetto nacque negli anni Trenta come accessorio per tenere insieme i capelli, prima di essere usato per chiudere i sacchetti?"
+→ troppo specifica e difficile da bluffare.
 
 RISPOSTA:
-Deve essere un numero puro oppure un nome breve.
-Se è numerica, non includere unità di misura nella risposta.
+Un numero puro oppure un nome breve. Se numerica, senza unità di misura.
 
 HINT:
-Una sola frase breve che spiega la risposta o aggiunge una curiosità.
+Una sola frase breve che spiega la risposta o aggiunge la curiosità che NON hai inserito nella domanda.
 
 Rispondi esclusivamente con JSON valido:
 {"question":"...","answer":"...","hint":"..."}`;
