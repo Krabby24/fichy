@@ -66,67 +66,132 @@ function getServerMessage(language, key) {
   return SERVER_MESSAGES[normalizedLanguage][key];
 }
 
-async function generateQuestion(language = 'it') {
+async function generateQuestion(language = 'it', gameContext = {}) {
   const normalizedLanguage = normalizeLanguage(language);
   const languageName = normalizedLanguage === 'en' ? 'inglese' : 'italiano';
   const usedQuestions = globalUsedQuestions[normalizedLanguage];
 
+  const {
+    round = 1,
+    totalRounds = ROUNDS_PER_GAME,
+    history = []
+  } = gameContext;
+
   const usedStr = usedQuestions.length > 0
     ? `NON ripetere queste domande già usate: ${usedQuestions.join('; ')}. `
     : '';
+
+  const usedCategories = history.map(item => item.category);
+  const numericCount = history.filter(item => item.answerType === 'number').length;
+  const remainingRounds = totalRounds - round + 1;
+
+  let numericRule;
+
+  if (numericCount >= 2) {
+    numericRule = 'La risposta NON deve essere numerica.';
+  } else if (numericCount === 0 && remainingRounds <= 2) {
+    numericRule = 'La risposta DEVE essere numerica: una data, un anno o una quantità.';
+  } else {
+    numericRule = 'La risposta può essere numerica oppure un nome. Nell’intera partita devono esserci almeno 1 e massimo 2 risposte numeriche.';
+  }
+
+  const gameHistory = history.length > 0
+    ? `
+CONTESTO DELLA PARTITA:
+Round attuale: ${round}/${totalRounds}.
+Categorie già usate: ${usedCategories.join(', ')}.
+Domande già usate in questa partita:
+${history.map((item, index) => `${index + 1}. ${item.question}`).join('\n')}
+
+La nuova domanda DEVE appartenere a una categoria diversa da tutte quelle già usate.
+Varia anche la struttura della frase: non iniziare e non formulare la domanda nello stesso modo dei round precedenti.
+`
+    : `
+CONTESTO DELLA PARTITA:
+Round attuale: ${round}/${totalRounds}.
+È la prima domanda: scegli liberamente la categoria.
+`;
 
   const prompt = `${usedStr}Genera UNA sola domanda trivia in ${languageName} per Fichy, un gioco tra amici basato sul bluff.
 
 Domanda, risposta e hint devono essere interamente in ${languageName}.
 
 OBIETTIVO PRINCIPALE:
-La domanda deve permettere anche a chi NON conosce la risposta di inventare subito diverse risposte false credibili con cui ingannare gli altri.
+Anche chi NON conosce la risposta deve riuscire a inventare subito diverse risposte false credibili con cui ingannare gli altri.
 
 REGOLA FONDAMENTALE:
 Se un giocatore medio che non conosce la risposta non riuscirebbe a pensare rapidamente ad almeno 3-5 risposte plausibili, scegli un'altra domanda.
 
+La domanda deve essere breve, semplice e immediatamente comprensibile.
+
 PREFERISCI:
-- categorie familiari e immediate: paesi, città, aziende, marchi, animali, cibi, sport, film, musica, oggetti comuni, personaggi famosi, spazio, cultura generale;
-- fatti non ovvi all'interno di argomenti conosciuti da tutti;
-- domande semplici, dirette e brevi.
+- argomenti familiari: paesi, città, aziende, marchi, sport, cinema, musica, cibo, animali, oggetti comuni, personaggi famosi, spazio e cultura generale;
+- fatti non ovvi dentro argomenti conosciuti da tutti;
+- domande in cui molte risposte diverse sembrano plausibili;
+- risposte che sorprendono senza richiedere conoscenze specialistiche.
 
 EVITA:
-- argomenti specialistici o di nicchia;
-- curiosità troppo oscure o arbitrarie;
-- domande in cui chi non sa può solo tirare completamente a caso;
-- dettagli, retroscena o spiegazioni che abbelliscono la domanda;
-- indizi che rendono la risposta troppo evidente;
-- formulazioni lunghe o narrative;
+- risposte banalissime o di dominio comune;
+- argomenti specialistici, oscuri o troppo specifici;
+- curiosità arbitrarie che chi non conosce può solo indovinare a caso;
+- dettagli, retroscena e spiegazioni narrative nella domanda;
+- parole, traduzioni, etimologie o indizi che suggeriscono direttamente la risposta;
+- formulazioni lunghe;
 - fatti controversi, ambigui o con più risposte corrette.
 
-La domanda deve contenere SOLO le informazioni necessarie per capire cosa viene chiesto.
-Eventuali dettagli curiosi o retroscena devono andare nell'hint, NON nella domanda.
+Non raccontare la curiosità nella domanda.
+La domanda deve contenere SOLO ciò che serve per capire cosa viene chiesto.
+I dettagli interessanti appartengono all'hint.
+
+Prima di scegliere la domanda chiediti:
+1. Chi non sa la risposta può bluffare facilmente?
+2. La risposta non è ovvia?
+3. La domanda è breve?
+4. La domanda non suggerisce la risposta?
+Se una risposta è NO, genera mentalmente un'altra domanda.
+
+${gameHistory}
+
+VARIETÀ NUMERICA:
+${numericRule}
 
 ESEMPI GIUSTI:
 "Quale paese possiede il maggior numero di isole al mondo?"
+"Quale paese ha più piramidi antiche al mondo?"
 "Quale azienda automobilistica diede a un suo modello il nome di una tempesta atlantica?"
-"Quale paese vinse il primo campionato mondiale di calcio femminile?"
+"In quale anno fu inviato il primo SMS?"
 
 ESEMPI DA EVITARE:
-"Quale famoso romanzo fu scritto da Bram Stoker, che non visitò mai la Transilvania?"
-→ la risposta è praticamente suggerita.
+"Quale paese ha inventato la pizza moderna?"
+→ troppo ovvia.
 
-"Quale oggetto nacque negli anni Trenta come accessorio per tenere insieme i capelli, prima di essere usato per chiudere i sacchetti?"
-→ troppo specifica e difficile da bluffare.
+"Quale paese ha dato il nome al cioccolato 'swiss'?"
+→ la risposta è suggerita dalla domanda.
+
+"Quale famoso romanzo fu scritto da Bram Stoker, che non visitò mai la Transilvania?"
+→ la risposta è praticamente regalata.
 
 RISPOSTA:
-Un numero puro oppure un nome breve. Se numerica, senza unità di misura.
+Deve essere un nome breve oppure un numero puro.
+Se numerica, NON includere unità di misura.
 
 HINT:
-Una sola frase breve che spiega la risposta o aggiunge la curiosità che NON hai inserito nella domanda.
+Una sola frase breve che spiega la risposta o aggiunge il dettaglio curioso escluso dalla domanda.
+
+CATEGORIA:
+Scegli UNA sola categoria tra:
+geography, history, sport, cinema, music, technology, brands, food, science, nature, space, everyday, culture.
+
+answerType deve essere:
+"name" oppure "number".
 
 Rispondi esclusivamente con JSON valido:
-{"question":"...","answer":"...","hint":"..."}`;
+{"question":"...","answer":"...","hint":"...","category":"...","answerType":"..."}`;
 
   const response = await openai.responses.create({
     model: 'gpt-5.6-luna',
     reasoning: { effort: 'none' },
-    max_output_tokens: 300,
+    max_output_tokens: 350,
     input: prompt,
     text: {
       format: {
@@ -138,9 +203,37 @@ Rispondi esclusivamente con JSON valido:
           properties: {
             question: { type: 'string' },
             answer: { type: 'string' },
-            hint: { type: 'string' }
+            hint: { type: 'string' },
+            category: {
+              type: 'string',
+              enum: [
+                'geography',
+                'history',
+                'sport',
+                'cinema',
+                'music',
+                'technology',
+                'brands',
+                'food',
+                'science',
+                'nature',
+                'space',
+                'everyday',
+                'culture'
+              ]
+            },
+            answerType: {
+              type: 'string',
+              enum: ['name', 'number']
+            }
           },
-          required: ['question', 'answer', 'hint'],
+          required: [
+            'question',
+            'answer',
+            'hint',
+            'category',
+            'answerType'
+          ],
           additionalProperties: false
         }
       }
@@ -150,6 +243,7 @@ Rispondi esclusivamente con JSON valido:
   if (response.status !== 'completed' || !response.output_text) {
     throw new Error(`OpenAI question generation failed: ${response.status}`);
   }
+
   return JSON.parse(response.output_text);
 }
 
@@ -185,6 +279,7 @@ io.on('connection', (socket) => {
       answers: {}, // playerId -> answer text
       bets: {},    // playerId -> { answerId: amount }
       usedQuestions: [],
+      questionHistory: [],
       timer: null
     };
     socket.join(code);
@@ -390,8 +485,17 @@ async function startRound(code) {
   io.to(code).emit('roundStarting', { round: room.round, total: ROUNDS_PER_GAME });
 
   try {
-    const q = await generateQuestion(room.language);
+    const q = await generateQuestion(room.language, {
+      round: room.round,
+      totalRounds: ROUNDS_PER_GAME,
+      history: room.questionHistory || []
+    });
     room.currentQuestion = q;
+    room.questionHistory.push({
+      question: q.question,
+      category: q.category,
+      answerType: q.answerType
+    });
     // Add to the language-specific global sliding window — remove oldest if over limit
     const questionBuffer = globalUsedQuestions[normalizeLanguage(room.language)];
     questionBuffer.push(q.question);
@@ -431,6 +535,12 @@ async function startRound(code) {
         hint: 'I neonati ne hanno circa 270, poi alcune si fondono.'
       };
     }
+    room.questionHistory.push({
+      question: room.currentQuestion.question,
+      category: 'science',
+      answerType: 'number'
+    });
+
     io.to(code).emit('questionReady', {
       round: room.round,
       total: ROUNDS_PER_GAME,
