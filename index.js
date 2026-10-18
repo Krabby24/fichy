@@ -439,6 +439,47 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Leave room explicitly (used when a player returns to the home screen)
+  socket.on('leaveRoom', ({ code }) => {
+    const room = rooms[code];
+
+    if (!room || !room.players[socket.id]) {
+      socket.leave(code);
+      return;
+    }
+
+    const wasHost = room.host === socket.id;
+
+    // Remove all references to this player from the current room state.
+    delete room.players[socket.id];
+    delete room.answers[socket.id];
+    delete room.bets[socket.id];
+
+    if (room.answerPool) {
+      room.answerPool = room.answerPool.filter(answer => answer.authorId !== socket.id);
+    }
+
+    socket.leave(code);
+
+    const remainingIds = Object.keys(room.players);
+
+    // No players left: clean up the in-memory room completely.
+    if (remainingIds.length === 0) {
+      clearTimeout(room.timer);
+      delete rooms[code];
+      return;
+    }
+
+    // If the host explicitly leaves, transfer host ownership.
+    if (wasHost) {
+      const connectedIds = remainingIds.filter(id => room.players[id].connected);
+      room.host = connectedIds[0] || remainingIds[0];
+      io.to(code).emit('newHost', { hostId: room.host });
+    }
+
+    io.to(code).emit('roomUpdate', getRoomPublicState(code));
+  });
+
   // Disconnect
   socket.on('disconnect', () => {
     for (const code in rooms) {
@@ -459,6 +500,59 @@ io.on('connection', (socket) => {
         }
       }
     }
+  });
+
+  // Rematch (host only)
+  socket.on('rematchGame', ({ code }) => {
+    const room = rooms[code];
+
+    if (!room || room.host !== socket.id) return;
+    if (room.state !== 'gameover') return;
+
+    const connectedPlayerIds = Object.keys(room.players).filter(
+      id => room.players[id].connected
+    );
+
+    if (connectedPlayerIds.length < 2) {
+      return socket.emit('error', {
+        message: getServerMessage(room.language, 'needTwoPlayers')
+      });
+    }
+
+    clearTimeout(room.timer);
+
+    // A rematch contains only players who are still actively connected.
+    // This prevents disconnected "ghost" players from blocking answer/bet phases.
+    Object.keys(room.players).forEach(pid => {
+      if (!room.players[pid].connected) {
+        delete room.players[pid];
+      }
+    });
+
+    // Reset player-specific match statistics while preserving identity and connection.
+    Object.values(room.players).forEach(player => {
+      player.fiches = STARTING_FICHES;
+      player.correctStreak = 0;
+    });
+
+    // Reset all match-specific room state.
+    // Room code, language, host and connected players are intentionally preserved.
+    room.round = 0;
+    room.currentQuestion = null;
+    room.answers = {};
+    room.bets = {};
+    room.usedQuestions = [];
+    room.questionHistory = [];
+    room.answerPool = null;
+    room.fichesAtRoundStart = {};
+    room.timer = null;
+    room.state = 'lobby';
+
+    // Reuse the normal round-start flow so the rematch behaves exactly like a new game.
+    startRound(code);
+
+    // Refresh public room state after pruning/resetting players and fiches.
+    io.to(code).emit('roomUpdate', getRoomPublicState(code));
   });
 
   // Next round (host only)
